@@ -63,13 +63,36 @@
           <h2>Spent this week</h2>
           <p id="week-total" class="summary-amount">$0.00</p>
         </article>
-        <article class="summary-card optional-detail">
+        <article class="summary-card">
           <h2>Spent this month</h2>
           <p id="month-total" class="summary-amount">$0.00</p>
         </article>
       </div>
 
-      <section class="content-card optional-detail" aria-labelledby="chart-heading">
+      <section class="content-card category-chart-card" aria-labelledby="category-chart-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="category-chart-heading">Spending by category</h2>
+            <p class="muted">See where your money went during a time period.</p>
+          </div>
+        </div>
+        <div class="category-chart-controls">
+          <label for="category-chart-period">Time period</label>
+          <select id="category-chart-period">
+            <option value="daily">Daily</option>
+            <option value="weekly" selected>Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div class="category-chart-layout">
+          <div id="category-pie-chart" class="category-pie-chart"></div>
+          <div id="category-chart-legend" class="category-chart-legend" aria-label="Expense categories"></div>
+        </div>
+        <p id="category-chart-detail" class="category-chart-detail" role="status" aria-live="polite">Select a category in the chart or legend to see its details.</p>
+        <p id="category-chart-summary" class="category-chart-summary" aria-live="polite"></p>
+      </section>
+
+      <section class="content-card" aria-labelledby="chart-heading">
         <div class="section-heading">
           <div>
             <h2 id="chart-heading">Your last 7 days</h2>
@@ -216,28 +239,6 @@
         <button class="button button-primary button-large" type="submit">Save allowance</button>
       </form>
       <section id="budget-summary-card" class="content-card budget-summary" aria-live="polite"></section>
-      <section class="content-card category-chart-card" aria-labelledby="category-chart-heading">
-        <div class="section-heading">
-          <div>
-            <h2 id="category-chart-heading">Spending by category</h2>
-            <p class="muted">See where your money went during a time period.</p>
-          </div>
-        </div>
-        <div class="category-chart-controls">
-          <label for="category-chart-period">Time period</label>
-          <select id="category-chart-period">
-            <option value="daily">Daily</option>
-            <option value="weekly" selected>Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-        <div class="category-chart-layout">
-          <div id="category-pie-chart" class="category-pie-chart"></div>
-          <div id="category-chart-legend" class="category-chart-legend" aria-label="Expense categories"></div>
-        </div>
-        <p id="category-chart-detail" class="category-chart-detail" role="status" aria-live="polite">Select a category in the chart or legend to see its details.</p>
-        <p id="category-chart-summary" class="category-chart-summary" aria-live="polite"></p>
-      </section>
     </section>
 
     <section id="view-settings" class="view" hidden>
@@ -245,7 +246,7 @@
         <div>
           <p class="eyebrow">MAKE IT COMFORTABLE FOR YOU</p>
           <h1>Settings</h1>
-          <p class="intro">Choose how the app looks and when it reminds you.</p>
+          <p class="intro">Choose how the app looks.</p>
         </div>
       </div>
       <section class="content-card settings-card" aria-labelledby="display-settings-heading">
@@ -257,27 +258,6 @@
           </span>
           <input id="large-text-toggle" type="checkbox">
         </label>
-        <label class="setting-row" for="simple-mode-toggle">
-          <span>
-            <strong>Simple mode</strong>
-            <span class="setting-description">Show the most important information first.</span>
-          </span>
-          <input id="simple-mode-toggle" type="checkbox">
-        </label>
-      </section>
-      <section class="content-card settings-card" aria-labelledby="reminder-heading">
-        <h2 id="reminder-heading">Daily reminder</h2>
-        <p class="muted">A gentle reminder to record what you spent today. Keep this page open for reminders.</p>
-        <label class="setting-row" for="reminder-enabled">
-          <span>
-            <strong>Turn on daily reminders</strong>
-            <span class="setting-description">You can switch this off at any time.</span>
-          </span>
-          <input id="reminder-enabled" type="checkbox">
-        </label>
-        <label for="reminder-time">What time should we remind you?</label>
-        <input id="reminder-time" class="time-input" type="time" value="19:00">
-        <p class="form-note">Your expenses and preferences stay in this browser on this device.</p>
       </section>
       <section class="content-card settings-card" aria-labelledby="clear-data-heading">
         <h2 id="clear-data-heading">Clear saved data</h2>

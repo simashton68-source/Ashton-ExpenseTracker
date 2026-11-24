@@ -1183,11 +1183,6 @@ select {
   transform: translateX(24px);
 }
 
-.time-input {
-  max-width: 240px;
-  margin-top: 6px;
-}
-
 body.large-text {
   font-size: 21px;
 }
@@ -1200,10 +1195,6 @@ body.large-text h2,
 body.large-text label,
 body.large-text .expense-description {
   font-size: 1.15em;
-}
-
-body.simple-mode .optional-detail {
-  display: none;
 }
 
 footer {

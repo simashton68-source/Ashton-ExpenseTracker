@@ -29,8 +29,6 @@ const CATEGORY_CHART_COLORS = [
   "#514c9c",
   "#667788"
 ];
-const REMINDER_MESSAGE = "Have you recorded all your expenses today? Take a moment to update your spending!";
-
 function createDefaultState() {
   return {
     expenses: [],
@@ -38,11 +36,7 @@ function createDefaultState() {
       allowanceType: null,
       allowance: null,
       budgetAlerts: {},
-      largeText: false,
-      simpleMode: false,
-      reminderEnabled: false,
-      reminderTime: "19:00",
-      lastReminderDate: ""
+      largeText: false
     }
   };
 }
@@ -89,7 +83,11 @@ function loadState() {
       return expense;
     });
 
-    const savedPreferences = parsed.preferences;
+    const savedPreferences = { ...parsed.preferences };
+    delete savedPreferences.reminderEnabled;
+    delete savedPreferences.reminderTime;
+    delete savedPreferences.lastReminderDate;
+    delete savedPreferences.simpleMode;
     const allowanceType = ["daily", "weekly"].includes(savedPreferences.allowanceType)
       ? savedPreferences.allowanceType
       : null;
@@ -105,10 +103,6 @@ function loadState() {
         allowanceType,
         allowance,
         largeText: savedPreferences.largeText === true,
-        simpleMode: savedPreferences.simpleMode === true,
-        reminderEnabled: savedPreferences.reminderEnabled === true,
-        reminderTime: isValidTime(savedPreferences.reminderTime) ? savedPreferences.reminderTime : "19:00",
-        lastReminderDate: typeof savedPreferences.lastReminderDate === "string" ? savedPreferences.lastReminderDate : "",
         budgetAlerts: savedPreferences.budgetAlerts && typeof savedPreferences.budgetAlerts === "object"
           ? savedPreferences.budgetAlerts
           : {}
@@ -148,10 +142,6 @@ function isValidDateString(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00`);
   return !Number.isNaN(date.getTime()) && localDateString(date) === value;
-}
-
-function isValidTime(value) {
-  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 function formatCurrency(amount) {
@@ -941,11 +931,7 @@ document.querySelector("#clear-all-data").addEventListener("click", () => {
 
 function applyDisplaySettings() {
   document.body.classList.toggle("large-text", state.preferences.largeText);
-  document.body.classList.toggle("simple-mode", state.preferences.simpleMode);
   document.querySelector("#large-text-toggle").checked = state.preferences.largeText;
-  document.querySelector("#simple-mode-toggle").checked = state.preferences.simpleMode;
-  document.querySelector("#reminder-enabled").checked = state.preferences.reminderEnabled;
-  document.querySelector("#reminder-time").value = state.preferences.reminderTime;
 }
 
 document.querySelector("#large-text-toggle").addEventListener("change", (event) => {
@@ -954,56 +940,6 @@ document.querySelector("#large-text-toggle").addEventListener("change", (event) 
   const saved = saveState();
   showMessage(saved ? "Your text size has been updated." : "Your text size changed for this session, but could not be saved on this device.", saved ? "success" : "error");
 });
-
-document.querySelector("#simple-mode-toggle").addEventListener("change", (event) => {
-  state.preferences.simpleMode = event.target.checked;
-  applyDisplaySettings();
-  const saved = saveState();
-  showMessage(saved ? "Your display preference has been updated." : "Your display changed for this session, but could not be saved on this device.", saved ? "success" : "error");
-});
-
-document.querySelector("#reminder-time").addEventListener("change", (event) => {
-  if (!isValidTime(event.target.value)) {
-    showMessage("Choose a valid reminder time.", "error");
-    applyDisplaySettings();
-    return;
-  }
-  state.preferences.reminderTime = event.target.value;
-  const saved = saveState();
-  showMessage(saved ? `Your daily reminder time is ${state.preferences.reminderTime}.` : "Your reminder time changed for this session, but could not be saved on this device.", saved ? "success" : "error");
-  checkReminder();
-});
-
-document.querySelector("#reminder-enabled").addEventListener("change", async (event) => {
-  const enabled = event.target.checked;
-  if (enabled && "Notification" in window && Notification.permission === "default") {
-    try {
-      await Notification.requestPermission();
-    } catch (error) {
-      console.error("Could not request notification permission:", error);
-      showMessage("Browser notifications could not be enabled. We will show reminders in the app while it is open.", "warning");
-    }
-  }
-  state.preferences.reminderEnabled = enabled;
-  const saved = saveState();
-  if (enabled) {
-    showMessage(saved ? "Daily reminders are on. Keep this page open to receive them." : "Daily reminders are on for this session, but could not be saved on this device.", saved ? "success" : "error");
-    checkReminder();
-  } else {
-    showMessage(saved ? "Daily reminders are off." : "Daily reminders are off for this session, but could not be saved on this device.", saved ? "success" : "error");
-  }
-});
-
-function checkReminder() {
-  if (!state.preferences.reminderEnabled || !isValidTime(state.preferences.reminderTime)) return;
-  const now = new Date();
-  const today = localDateString(now);
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  if (currentTime < state.preferences.reminderTime || state.preferences.lastReminderDate === today) return;
-  state.preferences.lastReminderDate = today;
-  saveState();
-  showMessage(REMINDER_MESSAGE, "success", true);
-}
 
 function renderAll() {
   renderDashboard();
@@ -1019,5 +955,3 @@ if (storageError) {
   storageWarning.textContent = "We could not read saved expenses on this device. Your existing records have not been changed. Please reload the page or check this browser's storage settings.";
   storageWarning.hidden = false;
 }
-checkReminder();
-window.setInterval(checkReminder, 30000);
