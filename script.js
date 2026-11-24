@@ -991,9 +991,44 @@ const ReceiptProcessor = (() => {
     return pdfjsPromise;
   }
 
+  async function prepareImageForOCR(file) {
+    const imageURL = URL.createObjectURL(file);
+    const image = new Image();
+
+    try {
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = () => reject(new Error(
+          "This photo format could not be opened. Try choosing a JPG or PNG photo."
+        ));
+        image.src = imageURL;
+      });
+
+      const maxDimension = 2200;
+      const scale = Math.min(
+        1,
+        maxDimension / Math.max(image.naturalWidth, image.naturalHeight)
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("This photo could not be prepared for scanning.");
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    } finally {
+      URL.revokeObjectURL(imageURL);
+    }
+  }
+
   // Extract text from an image using OCR
   async function extractImageText(file, onProgress = () => {}) {
     const Tesseract = await loadTesseract();
+    const image = await prepareImageForOCR(file);
 
     const worker = await Tesseract.createWorker("eng", 1, {
       logger: (message) => {
@@ -1004,7 +1039,7 @@ const ReceiptProcessor = (() => {
     });
 
     try {
-      const result = await worker.recognize(file);
+      const result = await worker.recognize(image);
       return {
         text: result.data.text,
         confidence: result.data.confidence
@@ -1206,11 +1241,12 @@ const ReceiptProcessor = (() => {
       throw new Error("Please upload a file smaller than 10 MB.");
     }
 
-    const isPDF = file.type === "application/pdf";
-    const isImage = [
-      "image/jpeg",
-      "image/png"
-    ].includes(file.type);
+    const fileName = file.name.toLowerCase();
+    const isPDF =
+      file.type === "application/pdf" || fileName.endsWith(".pdf");
+    const isImage =
+      file.type.startsWith("image/") ||
+      /\.(jpe?g|png|heic|heif|webp)$/.test(fileName);
 
     if (!isPDF && !isImage) {
       throw new Error("Please upload a JPG, PNG or PDF receipt.");
@@ -1284,3 +1320,84 @@ function applyReceiptToExpenseForm(receipt) {
 
   descriptionInput.focus();
 }
+
+const receiptFileInput = document.querySelector("#receipt-file");
+const receiptCameraInput = document.querySelector("#receipt-camera-input");
+const receiptPreview = document.querySelector("#receipt-preview");
+const receiptFileName = document.querySelector("#receipt-file-name");
+const removeReceiptButton = document.querySelector("#remove-receipt");
+const scanReceiptButton = document.querySelector("#scan-receipt-button");
+const takeReceiptPhotoButton = document.querySelector("#take-receipt-photo");
+const receiptStatus = document.querySelector("#receipt-status");
+let selectedReceiptFile = null;
+
+function clearReceiptSelection() {
+  selectedReceiptFile = null;
+  receiptFileInput.value = "";
+  receiptCameraInput.value = "";
+  receiptPreview.hidden = true;
+  receiptFileName.textContent = "";
+  receiptStatus.textContent = "";
+  scanReceiptButton.disabled = false;
+  scanReceiptButton.textContent = "Scan receipt";
+}
+
+receiptFileInput.addEventListener("change", () => {
+  selectedReceiptFile = receiptFileInput.files[0] || null;
+
+  if (!selectedReceiptFile) {
+    clearReceiptSelection();
+    return;
+  }
+
+  receiptFileName.textContent = selectedReceiptFile.name;
+  receiptPreview.hidden = false;
+  receiptStatus.textContent = "Receipt ready to scan.";
+});
+
+receiptCameraInput.addEventListener("change", () => {
+  const file = receiptCameraInput.files[0];
+  if (!file) return;
+
+  selectedReceiptFile = file;
+  receiptFileName.textContent = file.name || "Photo from camera";
+  receiptPreview.hidden = false;
+  receiptStatus.textContent = "Photo ready to scan.";
+});
+
+takeReceiptPhotoButton.addEventListener("click", () => {
+  receiptCameraInput.click();
+});
+
+removeReceiptButton.addEventListener("click", clearReceiptSelection);
+
+scanReceiptButton.addEventListener("click", async () => {
+  if (!selectedReceiptFile) {
+    receiptStatus.textContent = "Choose a receipt image or PDF first.";
+    return;
+  }
+
+  scanReceiptButton.disabled = true;
+  scanReceiptButton.textContent = "Scanning...";
+
+  try {
+    const receipt = await window.ReceiptProcessor.processFile(
+      selectedReceiptFile,
+      (progress) => {
+        receiptStatus.textContent = `Scanning receipt... ${progress}%`;
+      }
+    );
+
+    receiptStatus.textContent = "Receipt scanned. Check the details below.";
+    applyReceiptToExpenseForm(receipt);
+  } catch (error) {
+    console.error("Receipt scan failed:", error);
+    receiptStatus.textContent =
+      error instanceof Error
+        ? error.message
+        : "The receipt could not be scanned.";
+  } finally {
+    scanReceiptButton.disabled = false;
+    scanReceiptButton.textContent = "Scan receipt";
+  }
+});
