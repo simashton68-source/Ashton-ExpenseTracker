@@ -20,10 +20,11 @@
   </header>
 
   <nav class="main-nav" aria-label="Main navigation">
-    <button class="nav-button active" type="button" data-view="home" aria-current="page">Home</button>
-    <button class="nav-button" type="button" data-view="add">Add Expense</button>
-    <button class="nav-button" type="button" data-view="history">History</button>
-    <button class="nav-button" type="button" data-view="budget">Budget</button>
+    <button class="nav-button active" type="button" data-view="home" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span><span>Home</span></button>
+    <button class="nav-button" type="button" data-view="history"><span class="nav-icon" aria-hidden="true">▤</span><span>History</span></button>
+    <button class="nav-button" type="button" data-view="budget"><span class="nav-icon" aria-hidden="true">◉</span><span>Budget</span></button>
+    <button class="nav-button" type="button" data-view="add"><span class="nav-icon" aria-hidden="true">＋</span><span>Add Expense</span></button>
+    <button class="nav-button" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></button>
   </nav>
 
   <main>
@@ -34,7 +35,7 @@
       <div class="page-heading">
         <div>
           <p class="eyebrow">YOUR SPENDING</p>
-          <h1>Home</h1>
+          <h1 id="greeting-heading">Welcome</h1>
           <p class="intro">Here is a clear look at your money.</p>
         </div>
         <button class="button button-primary button-large" type="button" data-go="add">+ Add Expense</button>
@@ -45,6 +46,10 @@
           <p class="eyebrow">MONEY LEFT IN YOUR BUDGET</p>
           <h2 id="allowance-heading" class="allowance-amount">Set up your allowance</h2>
           <p id="allowance-detail" class="allowance-detail">Choose a daily or weekly allowance to see how much you have left.</p>
+          <div id="home-budget-progress" class="home-budget-progress" role="progressbar" aria-label="Allowance used" aria-valuemin="0" aria-valuemax="100" hidden>
+            <div id="home-budget-progress-fill" class="home-budget-progress-fill"></div>
+          </div>
+          <p id="home-budget-progress-label" class="home-budget-progress-label" hidden></p>
         </div>
         <button class="button button-light" type="button" data-go="budget">Set up budget</button>
       </section>
@@ -58,13 +63,13 @@
           <h2>Spent this week</h2>
           <p id="week-total" class="summary-amount">$0.00</p>
         </article>
-        <article class="summary-card">
+        <article class="summary-card optional-detail">
           <h2>Spent this month</h2>
           <p id="month-total" class="summary-amount">$0.00</p>
         </article>
       </div>
 
-      <section class="content-card" aria-labelledby="chart-heading">
+      <section class="content-card optional-detail" aria-labelledby="chart-heading">
         <div class="section-heading">
           <div>
             <h2 id="chart-heading">Your last 7 days</h2>
@@ -184,7 +189,7 @@
             <p id="history-total" class="muted"></p>
           </div>
         </div>
-        <div id="history-list" class="expense-list"></div>
+        <div id="history-list"></div>
       </section>
     </section>
 
@@ -211,6 +216,47 @@
         <button class="button button-primary button-large" type="submit">Save allowance</button>
       </form>
       <section id="budget-summary-card" class="content-card budget-summary" aria-live="polite"></section>
+    </section>
+
+    <section id="view-settings" class="view" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">MAKE IT COMFORTABLE FOR YOU</p>
+          <h1>Settings</h1>
+          <p class="intro">Choose how the app looks and when it reminds you.</p>
+        </div>
+      </div>
+      <section class="content-card settings-card" aria-labelledby="display-settings-heading">
+        <h2 id="display-settings-heading">Display and comfort</h2>
+        <label class="setting-row" for="large-text-toggle">
+          <span>
+            <strong>Large text</strong>
+            <span class="setting-description">Make words and controls easier to read.</span>
+          </span>
+          <input id="large-text-toggle" type="checkbox">
+        </label>
+        <label class="setting-row" for="simple-mode-toggle">
+          <span>
+            <strong>Simple mode</strong>
+            <span class="setting-description">Show the most important information first.</span>
+          </span>
+          <input id="simple-mode-toggle" type="checkbox">
+        </label>
+      </section>
+      <section class="content-card settings-card" aria-labelledby="reminder-heading">
+        <h2 id="reminder-heading">Daily reminder</h2>
+        <p class="muted">A gentle reminder to record what you spent today. Keep this page open for reminders.</p>
+        <label class="setting-row" for="reminder-enabled">
+          <span>
+            <strong>Turn on daily reminders</strong>
+            <span class="setting-description">You can switch this off at any time.</span>
+          </span>
+          <input id="reminder-enabled" type="checkbox">
+        </label>
+        <label for="reminder-time">What time should we remind you?</label>
+        <input id="reminder-time" class="time-input" type="time" value="19:00">
+        <p class="form-note">Your expenses and preferences stay in this browser on this device.</p>
+      </section>
     </section>
 
   </main>

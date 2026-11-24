@@ -9,13 +9,30 @@ const CATEGORIES = [
   "Entertainment",
   "Other Expenses"
 ];
+const CATEGORY_ICONS = {
+  "Food and Drinks": "🍽️",
+  Groceries: "🛒",
+  Transportation: "🚌",
+  Shopping: "🛍️",
+  Healthcare: "💊",
+  "Bills and Utilities": "💡",
+  Entertainment: "🎬",
+  "Other Expenses": "🧾"
+};
+const REMINDER_MESSAGE = "Have you recorded all your expenses today? Take a moment to update your spending!";
+
 function createDefaultState() {
   return {
     expenses: [],
     preferences: {
       allowanceType: null,
       allowance: null,
-      budgetAlerts: {}
+      budgetAlerts: {},
+      largeText: false,
+      simpleMode: false,
+      reminderEnabled: false,
+      reminderTime: "19:00",
+      lastReminderDate: ""
     }
   };
 }
@@ -76,6 +93,11 @@ function loadState() {
         ...savedPreferences,
         allowanceType,
         allowance,
+        largeText: savedPreferences.largeText === true,
+        simpleMode: savedPreferences.simpleMode === true,
+        reminderEnabled: savedPreferences.reminderEnabled === true,
+        reminderTime: isValidTime(savedPreferences.reminderTime) ? savedPreferences.reminderTime : "19:00",
+        lastReminderDate: typeof savedPreferences.lastReminderDate === "string" ? savedPreferences.lastReminderDate : "",
         budgetAlerts: savedPreferences.budgetAlerts && typeof savedPreferences.budgetAlerts === "object"
           ? savedPreferences.budgetAlerts
           : {}
@@ -115,6 +137,10 @@ function isValidDateString(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00`);
   return !Number.isNaN(date.getTime()) && localDateString(date) === value;
+}
+
+function isValidTime(value) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 function formatCurrency(amount) {
@@ -161,6 +187,7 @@ function setView(viewName) {
     else button.removeAttribute("aria-current");
   });
   if (viewName === "history") renderHistory();
+  window.scrollTo(0, 0);
 }
 
 function startOfWeek(date = new Date()) {
@@ -202,6 +229,9 @@ function getBudgetPeriod() {
 
 function renderDashboard() {
   const today = new Date();
+  const hour = today.getHours();
+  document.querySelector("#greeting-heading").textContent =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const todayString = localDateString(today);
   const weekStart = startOfWeek(today);
   const weekExpenses = expensesBetween(weekStart, today);
@@ -217,18 +247,35 @@ function renderDashboard() {
   const allowanceAmount = document.querySelector("#allowance-heading");
   const allowanceDetail = document.querySelector("#allowance-detail");
   const allowanceCard = document.querySelector("#allowance-card");
+  const progress = document.querySelector("#home-budget-progress");
+  const progressFill = document.querySelector("#home-budget-progress-fill");
+  const progressLabel = document.querySelector("#home-budget-progress-label");
   if (state.preferences.allowanceType && state.preferences.allowance) {
     const period = getBudgetPeriod();
     const spent = sumExpenses(period.expenses);
     const remaining = state.preferences.allowance - spent;
+    const ratio = spent / state.preferences.allowance;
+    const percentage = Math.min(100, ratio * 100);
+    const status = ratio >= 1 ? "over" : ratio >= 0.7 ? "warning" : "";
     allowanceAmount.textContent = formatCurrency(remaining);
+    allowanceAmount.classList.toggle("over-budget", remaining < 0);
     allowanceDetail.textContent = remaining >= 0
       ? `You have ${formatCurrency(remaining)} left for ${period.label}.`
       : `You are ${formatCurrency(Math.abs(remaining))} over your ${period.label} allowance.`;
+    progress.hidden = false;
+    progress.setAttribute("aria-valuenow", String(Math.round(percentage)));
+    progress.setAttribute("aria-valuetext", `${Math.round(percentage)} percent used`);
+    progressFill.style.width = `${percentage}%`;
+    progressFill.className = `home-budget-progress-fill${status ? ` ${status}` : ""}`;
+    progressLabel.hidden = false;
+    progressLabel.textContent = `${formatCurrency(spent)} of ${formatCurrency(state.preferences.allowance)} used`;
     allowanceCard.querySelector(".button").textContent = "Change budget";
   } else {
     allowanceAmount.textContent = "Set up your allowance";
+    allowanceAmount.classList.remove("over-budget");
     allowanceDetail.textContent = "Choose a daily or weekly allowance to see how much you have left.";
+    progress.hidden = true;
+    progressLabel.hidden = true;
     allowanceCard.querySelector(".button").textContent = "Set up budget";
   }
 
@@ -291,7 +338,12 @@ function createExpenseItem(expense, showActions) {
   meta.className = "expense-meta";
   const category = document.createElement("span");
   category.className = "category-label";
+  const icon = document.createElement("span");
+  icon.className = `category-icon category-${CATEGORIES.indexOf(expense.category)}`;
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = CATEGORY_ICONS[expense.category] || CATEGORY_ICONS["Other Expenses"];
   category.textContent = expense.category;
+  category.prepend(icon);
   const date = document.createElement("span");
   date.textContent = formatDate(expense.date);
   meta.append(category, date);
@@ -369,12 +421,43 @@ function renderHistory() {
   document.querySelector("#history-month-total").textContent = formatCurrency(
     sumExpenses(state.expenses.filter((expense) => expense.date >= monthStartString && expense.date <= today))
   );
-  renderExpenseList(
-    document.querySelector("#history-list"),
-    expenses,
-    state.expenses.length === 0 ? "Your recorded expenses will appear here." : "No expenses match these filters.",
-    true
-  );
+  const historyList = document.querySelector("#history-list");
+  historyList.replaceChildren();
+  if (expenses.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = state.expenses.length === 0
+      ? "Your recorded expenses will appear here."
+      : "No expenses match these filters.";
+    historyList.append(empty);
+    return;
+  }
+  const todayDate = new Date();
+  const todayString = localDateString(todayDate);
+  const yesterdayDate = new Date(todayDate);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayString = localDateString(yesterdayDate);
+  const groups = new Map();
+  expenses.forEach((expense) => {
+    const label = expense.date === todayString
+      ? "Today"
+      : expense.date === yesterdayString
+        ? "Yesterday"
+        : "Previous Days";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(expense);
+  });
+  groups.forEach((items, label) => {
+    const group = document.createElement("section");
+    group.className = "history-group";
+    const heading = document.createElement("h3");
+    heading.textContent = label;
+    const list = document.createElement("div");
+    list.className = "expense-list";
+    renderExpenseList(list, items, "", true);
+    group.append(heading, list);
+    historyList.append(group);
+  });
 }
 
 function renderBudget() {
@@ -399,30 +482,45 @@ function renderBudget() {
   const spent = sumExpenses(period.expenses);
   const allowance = state.preferences.allowance;
   const remaining = allowance - spent;
-  const percentage = Math.min(100, spent / allowance * 100);
+  const ratio = spent / allowance;
+  const percentage = Math.min(100, ratio * 100);
+  const status = ratio >= 1 ? "over" : ratio >= 0.7 ? "warning" : "";
   const heading = document.createElement("h2");
   heading.textContent = `${state.preferences.allowanceType === "daily" ? "Daily" : "Weekly"} allowance`;
-  const progress = document.createElement("div");
-  progress.className = "budget-progress";
-  progress.setAttribute("role", "progressbar");
-  progress.setAttribute("aria-label", "Allowance used");
-  progress.setAttribute("aria-valuemin", "0");
-  progress.setAttribute("aria-valuemax", "100");
-  progress.setAttribute("aria-valuenow", String(Math.min(100, Math.round(percentage))));
-  const fill = document.createElement("div");
-  fill.className = `budget-progress-fill${remaining < 0 ? " over" : ""}`;
-  fill.style.width = `${percentage}%`;
-  progress.append(fill);
+  const ring = document.createElement("div");
+  ring.className = `budget-ring${status ? ` ${status}` : ""}`;
+  ring.style.setProperty("--progress", `${percentage}%`);
+  ring.setAttribute("role", "progressbar");
+  ring.setAttribute("aria-label", "Allowance used");
+  ring.setAttribute("aria-valuemin", "0");
+  ring.setAttribute("aria-valuemax", "100");
+  ring.setAttribute("aria-valuenow", String(Math.min(100, Math.round(percentage))));
+  const ringCenter = document.createElement("div");
+  ringCenter.className = "budget-ring-center";
+  const ringValue = document.createElement("strong");
+  ringValue.textContent = `${Math.round(percentage)}%`;
+  const ringCaption = document.createElement("span");
+  ringCaption.textContent = "used";
+  ringCenter.append(ringValue, ringCaption);
+  ring.append(ringCenter);
   const numbers = document.createElement("div");
-  numbers.className = "budget-numbers";
+  numbers.className = `budget-numbers${status ? ` ${status}` : ""}`;
   const spentText = document.createElement("span");
   spentText.textContent = `${formatCurrency(spent)} spent out of ${formatCurrency(allowance)}`;
   const leftText = document.createElement("span");
   leftText.textContent = remaining >= 0
     ? `${formatCurrency(remaining)} left ${period.label}`
     : `${formatCurrency(Math.abs(remaining))} over your allowance`;
-  summary.append(heading, progress, numbers);
+  const statusText = document.createElement("p");
+  statusText.className = `budget-status${status ? ` ${status}` : ""}`;
+  statusText.textContent = ratio >= 1
+    ? "Your allowance has been reached."
+    : ratio >= 0.7
+      ? "You are getting close to your allowance."
+      : "You are within your allowance.";
+  summary.append(heading, ring, numbers);
   numbers.append(spentText, leftText);
+  summary.append(statusText);
 }
 
 function suggestCategory(description) {
@@ -615,10 +713,77 @@ document.querySelector("#clear-filters").addEventListener("click", () => {
   renderHistory();
 });
 
+function applyDisplaySettings() {
+  document.body.classList.toggle("large-text", state.preferences.largeText);
+  document.body.classList.toggle("simple-mode", state.preferences.simpleMode);
+  document.querySelector("#large-text-toggle").checked = state.preferences.largeText;
+  document.querySelector("#simple-mode-toggle").checked = state.preferences.simpleMode;
+  document.querySelector("#reminder-enabled").checked = state.preferences.reminderEnabled;
+  document.querySelector("#reminder-time").value = state.preferences.reminderTime;
+}
+
+document.querySelector("#large-text-toggle").addEventListener("change", (event) => {
+  state.preferences.largeText = event.target.checked;
+  applyDisplaySettings();
+  const saved = saveState();
+  showMessage(saved ? "Your text size has been updated." : "Your text size changed for this session, but could not be saved on this device.", saved ? "success" : "error");
+});
+
+document.querySelector("#simple-mode-toggle").addEventListener("change", (event) => {
+  state.preferences.simpleMode = event.target.checked;
+  applyDisplaySettings();
+  const saved = saveState();
+  showMessage(saved ? "Your display preference has been updated." : "Your display changed for this session, but could not be saved on this device.", saved ? "success" : "error");
+});
+
+document.querySelector("#reminder-time").addEventListener("change", (event) => {
+  if (!isValidTime(event.target.value)) {
+    showMessage("Choose a valid reminder time.", "error");
+    applyDisplaySettings();
+    return;
+  }
+  state.preferences.reminderTime = event.target.value;
+  const saved = saveState();
+  showMessage(saved ? `Your daily reminder time is ${state.preferences.reminderTime}.` : "Your reminder time changed for this session, but could not be saved on this device.", saved ? "success" : "error");
+  checkReminder();
+});
+
+document.querySelector("#reminder-enabled").addEventListener("change", async (event) => {
+  const enabled = event.target.checked;
+  if (enabled && "Notification" in window && Notification.permission === "default") {
+    try {
+      await Notification.requestPermission();
+    } catch (error) {
+      console.error("Could not request notification permission:", error);
+      showMessage("Browser notifications could not be enabled. We will show reminders in the app while it is open.", "warning");
+    }
+  }
+  state.preferences.reminderEnabled = enabled;
+  const saved = saveState();
+  if (enabled) {
+    showMessage(saved ? "Daily reminders are on. Keep this page open to receive them." : "Daily reminders are on for this session, but could not be saved on this device.", saved ? "success" : "error");
+    checkReminder();
+  } else {
+    showMessage(saved ? "Daily reminders are off." : "Daily reminders are off for this session, but could not be saved on this device.", saved ? "success" : "error");
+  }
+});
+
+function checkReminder() {
+  if (!state.preferences.reminderEnabled || !isValidTime(state.preferences.reminderTime)) return;
+  const now = new Date();
+  const today = localDateString(now);
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  if (currentTime < state.preferences.reminderTime || state.preferences.lastReminderDate === today) return;
+  state.preferences.lastReminderDate = today;
+  saveState();
+  showMessage(REMINDER_MESSAGE, "success", true);
+}
+
 function renderAll() {
   renderDashboard();
   renderHistory();
   renderBudget();
+  applyDisplaySettings();
 }
 
 dateInput.value = localDateString();
@@ -627,3 +792,5 @@ if (storageError) {
   storageWarning.textContent = "We could not read saved expenses on this device. Your existing records have not been changed. Please reload the page or check this browser's storage settings.";
   storageWarning.hidden = false;
 }
+checkReminder();
+window.setInterval(checkReminder, 30000);

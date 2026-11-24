@@ -727,3 +727,410 @@ footer p {
     transition-duration: 0.01ms !important;
   }
 }
+
+:root {
+  --ink: #172b4d;
+  --muted: #52657a;
+  --paper: #fff;
+  --page: #f3f6fa;
+  --line: #d7e0e9;
+  --blue: #1769aa;
+  --blue-dark: #124e80;
+  --mint: #e4f4eb;
+  --mint-ink: #164b32;
+  --warning: #fff2d9;
+  --danger: #a52b25;
+  --focus: #e49a14;
+}
+
+main {
+  padding-bottom: 112px;
+}
+
+.main-nav {
+  position: fixed;
+  z-index: 20;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  display: grid;
+  width: min(calc(100% - 32px), 760px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 8px;
+  transform: translateX(-50%);
+  border: 1px solid #d5e0ea;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgb(23 43 77 / 16%);
+}
+
+.nav-button {
+  display: flex;
+  min-width: 0;
+  min-height: 66px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 3px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--muted);
+  line-height: 1.15;
+}
+
+.nav-button:hover,
+.nav-button.active {
+  border-color: transparent;
+  background: #eaf3fb;
+  color: var(--blue-dark);
+}
+
+.nav-button.active {
+  font-weight: 750;
+}
+
+.nav-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.allowance-card {
+  min-height: 220px;
+  padding: clamp(24px, 5vw, 38px);
+  border: 1px solid #c8e5d4;
+  box-shadow: 0 8px 24px rgb(22 75 50 / 8%);
+}
+
+.allowance-amount {
+  margin-block: 6px;
+  font-size: clamp(3rem, 9vw, 4.5rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.allowance-amount.over-budget {
+  color: var(--danger);
+}
+
+.home-budget-progress {
+  width: min(100%, 560px);
+  height: 18px;
+  margin-top: 20px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(22 75 50 / 14%);
+}
+
+.home-budget-progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #26814c;
+}
+
+.home-budget-progress-fill.warning {
+  background: #d78112;
+}
+
+.home-budget-progress-fill.over {
+  background: #b42318;
+}
+
+.home-budget-progress-label {
+  margin: 5px 0 0;
+  color: #284f43;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.summary-card,
+.content-card {
+  border-color: var(--line);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgb(23 43 77 / 5%);
+}
+
+.summary-card {
+  padding: 20px;
+}
+
+.button,
+input,
+select {
+  border-radius: 12px;
+}
+
+.button-large {
+  min-height: 62px;
+}
+
+#expense-description {
+  min-height: 64px;
+  font-size: 1.08rem;
+}
+
+.expense-item {
+  padding-block: 17px;
+}
+
+.category-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 5px;
+  background: #edf3fa;
+  color: #284b5b;
+}
+
+.category-icon {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcedff;
+  font-size: 1rem;
+}
+
+.category-0 { background: #ffeadb; }
+.category-1 { background: #e3f3d9; }
+.category-2 { background: #dceeff; }
+.category-3 { background: #f4e3ff; }
+.category-4 { background: #ffe3e5; }
+.category-5 { background: #fff0c9; }
+.category-6 { background: #e7e5ff; }
+.category-7 { background: #e9edf2; }
+
+.history-group {
+  margin-top: 22px;
+}
+
+.history-group:first-child {
+  margin-top: 0;
+}
+
+.history-group h3 {
+  margin: 0 0 8px;
+  color: var(--blue-dark);
+  font-size: 1.05rem;
+}
+
+.budget-summary {
+  text-align: center;
+}
+
+.budget-summary h2 {
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.budget-ring {
+  --progress-color: #27814d;
+  display: grid;
+  width: clamp(170px, 48vw, 220px);
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 8px auto 22px;
+  border-radius: 50%;
+  background: conic-gradient(var(--progress-color) var(--progress), #e5ebf1 0);
+}
+
+.budget-ring.warning {
+  --progress-color: #d78112;
+}
+
+.budget-ring.over {
+  --progress-color: #b42318;
+}
+
+.budget-ring-center {
+  display: flex;
+  width: 76%;
+  height: 76%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.budget-ring-center strong {
+  font-size: 2.2rem;
+  line-height: 1.15;
+}
+
+.budget-ring-center span {
+  color: var(--muted);
+}
+
+.budget-numbers {
+  justify-content: center;
+  gap: 8px 28px;
+}
+
+.budget-numbers.warning span:last-child {
+  color: #89510c;
+}
+
+.budget-numbers.over span:last-child {
+  color: var(--danger);
+}
+
+.budget-status {
+  margin: 16px 0 0;
+  color: #267247;
+  font-weight: 700;
+}
+
+.budget-status.warning {
+  color: #89510c;
+}
+
+.budget-status.over {
+  color: var(--danger);
+}
+
+.settings-card {
+  max-width: 760px;
+}
+
+.settings-card > h2 {
+  margin-bottom: 8px;
+}
+
+.setting-row {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.setting-row > span {
+  display: grid;
+  gap: 2px;
+}
+
+.setting-description {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 400;
+}
+
+.setting-row input[type="checkbox"] {
+  position: relative;
+  width: 58px;
+  min-width: 58px;
+  height: 34px;
+  min-height: 34px;
+  flex: 0 0 58px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  border: 2px solid #75869a;
+  border-radius: 999px;
+  background: #e2e8ef;
+  cursor: pointer;
+}
+
+.setting-row input[type="checkbox"]::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+  content: "";
+}
+
+.setting-row input[type="checkbox"]:checked {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.setting-row input[type="checkbox"]:checked::before {
+  transform: translateX(24px);
+}
+
+.time-input {
+  max-width: 240px;
+  margin-top: 6px;
+}
+
+body.large-text {
+  font-size: 21px;
+}
+
+body.large-text h1 {
+  font-size: clamp(2.3rem, 6vw, 3rem);
+}
+
+body.large-text h2,
+body.large-text label,
+body.large-text .expense-description {
+  font-size: 1.15em;
+}
+
+body.simple-mode .optional-detail {
+  display: none;
+}
+
+footer {
+  padding-bottom: 130px;
+}
+
+@media (max-width: 700px) {
+  .header-content,
+  main,
+  footer {
+    width: min(100% - 24px, 1000px);
+  }
+
+  .main-nav {
+    width: calc(100% - 16px);
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .nav-button {
+    min-height: 66px;
+    padding: 5px 1px;
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+  }
+
+  .nav-icon {
+    font-size: 1.35rem;
+  }
+
+  .allowance-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .main-nav {
+    width: calc(100% - 10px);
+    gap: 0;
+    padding: 5px 3px;
+  }
+
+  .nav-button {
+    min-height: 62px;
+    font-size: 0.72rem;
+  }
+
+  .nav-icon {
+    font-size: 1.2rem;
+  }
+}
