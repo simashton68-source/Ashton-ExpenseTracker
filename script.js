@@ -19,6 +19,16 @@ const CATEGORY_ICONS = {
   Entertainment: "🎬",
   "Other Expenses": "🧾"
 };
+const CATEGORY_CHART_COLORS = [
+  "#c45127",
+  "#39784f",
+  "#26779a",
+  "#8b55a2",
+  "#b5414b",
+  "#a87808",
+  "#514c9c",
+  "#667788"
+];
 const REMINDER_MESSAGE = "Have you recorded all your expenses today? Take a moment to update your spending!";
 
 function createDefaultState() {
@@ -42,6 +52,7 @@ let storageError = null;
 let state = loadState();
 let editingExpenseId = null;
 let messageTimer = null;
+let selectedChartCategory = null;
 
 const appMessage = document.querySelector("#app-message");
 const storageWarning = document.querySelector("#storage-warning");
@@ -523,6 +534,190 @@ function renderBudget() {
   summary.append(statusText);
 }
 
+function renderCategoryChart() {
+  const periodInput = document.querySelector("#category-chart-period");
+  const chart = document.querySelector("#category-pie-chart");
+  const legend = document.querySelector("#category-chart-legend");
+  const detail = document.querySelector("#category-chart-detail");
+  const summary = document.querySelector("#category-chart-summary");
+  const period = periodInput.value;
+  const today = new Date();
+  const todayString = localDateString(today);
+  let periodLabel;
+  let expenses;
+
+  if (period === "daily") {
+    periodLabel = "today";
+    expenses = state.expenses.filter((expense) => expense.date === todayString);
+  } else if (period === "monthly") {
+    periodLabel = "this month";
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    expenses = expensesBetween(monthStart, today);
+  } else {
+    periodLabel = "this week";
+    expenses = expensesBetween(startOfWeek(today), today);
+  }
+
+  const allCategoryTotals = CATEGORIES.map((category, index) => ({
+    category,
+    amount: sumExpenses(expenses.filter((expense) => expense.category === category)),
+    color: CATEGORY_CHART_COLORS[index]
+  }));
+  const categoryTotals = allCategoryTotals.filter((item) => item.amount > 0);
+  const total = sumExpenses(expenses);
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNamespace, "svg");
+  svg.setAttribute("viewBox", "0 0 240 240");
+  svg.setAttribute("role", "group");
+  svg.setAttribute("aria-label", `Total spent ${formatCurrency(total)} ${periodLabel}`);
+  const centerX = 120;
+  const centerY = 120;
+  const outerRadius = 100;
+  const innerRadius = 56;
+  let startAngle = -90;
+
+  function selectCategory(category) {
+    selectedChartCategory = category;
+    const selected = categoryTotals.find((item) => item.category === category);
+    if (!selected) return;
+    const percentage = selected.amount / total * 100;
+    detail.textContent = `${selected.category}: ${formatCurrency(selected.amount)} (${percentage.toFixed(1)}% of ${periodLabel}'s spending).`;
+    svg.querySelectorAll("[data-chart-category]").forEach((slice) => {
+      slice.setAttribute("aria-pressed", String(slice.dataset.chartCategory === category));
+      slice.classList.toggle("selected", slice.dataset.chartCategory === category);
+    });
+    legend.querySelectorAll("[data-chart-category]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.chartCategory === category));
+    });
+  }
+
+  function addSliceInteraction(slice, category) {
+    slice.dataset.chartCategory = category;
+    slice.setAttribute("role", "button");
+    slice.setAttribute("tabindex", "0");
+    slice.setAttribute("aria-pressed", String(selectedChartCategory === category));
+    const categoryAmount = categoryTotals.find((item) => item.category === category).amount;
+    slice.setAttribute("aria-label", `${category}: ${formatCurrency(categoryAmount)} (${(categoryAmount / total * 100).toFixed(1)}%). Select for details.`);
+    slice.classList.toggle("selected", selectedChartCategory === category);
+    slice.addEventListener("click", () => selectCategory(category));
+    slice.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectCategory(category);
+      }
+    });
+  }
+
+  categoryTotals.forEach((item) => {
+    const slice = document.createElementNS(svgNamespace, categoryTotals.length === 1 ? "circle" : "path");
+    slice.setAttribute("fill", item.color);
+    if (categoryTotals.length === 1) {
+      slice.setAttribute("cx", String(centerX));
+      slice.setAttribute("cy", String(centerY));
+      slice.setAttribute("r", String(outerRadius));
+    } else {
+      const endAngle = startAngle + item.amount / total * 360;
+      const toPoint = (radius, angle) => {
+        const radians = angle * Math.PI / 180;
+        return {
+          x: centerX + radius * Math.cos(radians),
+          y: centerY + radius * Math.sin(radians)
+        };
+      };
+      const outerStart = toPoint(outerRadius, startAngle);
+      const outerEnd = toPoint(outerRadius, endAngle);
+      const innerEnd = toPoint(innerRadius, endAngle);
+      const innerStart = toPoint(innerRadius, startAngle);
+      const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+      slice.setAttribute("d", [
+        `M ${outerStart.x} ${outerStart.y}`,
+        `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+        `L ${innerEnd.x} ${innerEnd.y}`,
+        `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+        "Z"
+      ].join(" "));
+      startAngle = endAngle;
+    }
+    addSliceInteraction(slice, item.category);
+    svg.append(slice);
+  });
+
+  if (categoryTotals.length === 0) {
+    const emptyCircle = document.createElementNS(svgNamespace, "circle");
+    emptyCircle.setAttribute("cx", String(centerX));
+    emptyCircle.setAttribute("cy", String(centerY));
+    emptyCircle.setAttribute("r", String(outerRadius));
+    emptyCircle.setAttribute("fill", "#e5ebf1");
+    svg.append(emptyCircle);
+  }
+
+  const centerCircle = document.createElementNS(svgNamespace, "circle");
+  centerCircle.setAttribute("cx", String(centerX));
+  centerCircle.setAttribute("cy", String(centerY));
+  centerCircle.setAttribute("r", String(innerRadius));
+  centerCircle.setAttribute("fill", "#fff");
+  centerCircle.setAttribute("pointer-events", "none");
+  svg.append(centerCircle);
+
+  const centerAmount = document.createElementNS(svgNamespace, "text");
+  centerAmount.setAttribute("x", String(centerX));
+  centerAmount.setAttribute("y", "115");
+  centerAmount.setAttribute("text-anchor", "middle");
+  centerAmount.setAttribute("textLength", "100");
+  centerAmount.setAttribute("lengthAdjust", "spacingAndGlyphs");
+  centerAmount.setAttribute("class", "category-chart-center-amount");
+  centerAmount.setAttribute("pointer-events", "none");
+  centerAmount.textContent = formatCurrency(total);
+  const centerLabel = document.createElementNS(svgNamespace, "text");
+  centerLabel.setAttribute("x", String(centerX));
+  centerLabel.setAttribute("y", "138");
+  centerLabel.setAttribute("text-anchor", "middle");
+  centerLabel.setAttribute("class", "category-chart-center-label");
+  centerLabel.setAttribute("pointer-events", "none");
+  centerLabel.textContent = "total spent";
+  svg.append(centerAmount, centerLabel);
+  chart.replaceChildren(svg);
+
+  legend.replaceChildren();
+  allCategoryTotals.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "category-chart-legend-item";
+    button.dataset.chartCategory = item.category;
+    button.disabled = item.amount === 0;
+    button.setAttribute("aria-pressed", String(selectedChartCategory === item.category));
+    const swatch = document.createElement("span");
+    swatch.className = "category-chart-swatch";
+    swatch.style.backgroundColor = item.color;
+    swatch.setAttribute("aria-hidden", "true");
+    const label = document.createElement("span");
+    const percentage = total > 0 ? (item.amount / total * 100).toFixed(1) : "0.0";
+    label.textContent = `${item.category} - ${formatCurrency(item.amount)} (${percentage}%)`;
+    button.append(swatch, label);
+    if (item.amount > 0) button.addEventListener("click", () => selectCategory(item.category));
+    legend.append(button);
+  });
+
+  if (categoryTotals.length === 0) {
+    selectedChartCategory = null;
+    detail.textContent = `No expenses recorded ${periodLabel} yet. Add an expense to see the breakdown.`;
+    summary.textContent = `No expenses recorded ${periodLabel} yet.`;
+    return;
+  }
+
+  const highestCategory = categoryTotals.reduce((highest, item) =>
+    item.amount > highest.amount ? item : highest
+  );
+  const highestPercentage = Math.round(highestCategory.amount / total * 100);
+  summary.textContent = `You spent the most on ${highestCategory.category} ${periodLabel}, accounting for ${highestPercentage}% of your total expenses.`;
+  if (!categoryTotals.some((item) => item.category === selectedChartCategory)) {
+    selectedChartCategory = null;
+    detail.textContent = "Select a category in the chart or legend to see its amount and percentage.";
+  } else {
+    selectCategory(selectedChartCategory);
+  }
+}
+
 function suggestCategory(description) {
   const text = description.toLocaleLowerCase();
   const rules = [
@@ -637,6 +832,11 @@ document.querySelector("#cancel-edit-button").addEventListener("click", () => {
   setView("history");
 });
 
+document.querySelector("#category-chart-period").addEventListener("change", () => {
+  selectedChartCategory = null;
+  renderCategoryChart();
+});
+
 descriptionInput.addEventListener("input", () => {
   categoryInput.value = suggestCategory(descriptionInput.value);
 });
@@ -713,6 +913,32 @@ document.querySelector("#clear-filters").addEventListener("click", () => {
   renderHistory();
 });
 
+document.querySelector("#clear-all-data").addEventListener("click", () => {
+  const confirmed = window.confirm("Clear all saved expenses, your budget, and settings from this browser? This cannot be undone.");
+  if (!confirmed) return;
+
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error("Could not clear saved expense data:", error);
+    showMessage("Your saved data could not be cleared. Check this browser's storage settings and try again.", "error");
+    return;
+  }
+
+  storageReady = true;
+  storageError = null;
+  state = createDefaultState();
+  resetExpenseForm();
+  budgetForm.reset();
+  document.querySelector("#search-expenses").value = "";
+  document.querySelector("#filter-category").value = "";
+  document.querySelector("#filter-from").value = "";
+  document.querySelector("#filter-to").value = "";
+  storageWarning.hidden = true;
+  renderAll();
+  showMessage("All saved expense data has been cleared.");
+});
+
 function applyDisplaySettings() {
   document.body.classList.toggle("large-text", state.preferences.largeText);
   document.body.classList.toggle("simple-mode", state.preferences.simpleMode);
@@ -783,6 +1009,7 @@ function renderAll() {
   renderDashboard();
   renderHistory();
   renderBudget();
+  renderCategoryChart();
   applyDisplaySettings();
 }
 

@@ -201,6 +201,16 @@ h2 {
   background: #e9f2f5;
 }
 
+.button-danger {
+  border-color: var(--danger);
+  background: #fff;
+  color: var(--danger);
+}
+
+.button-danger:hover {
+  background: #fbecea;
+}
+
 .button-large {
   min-height: 58px;
   padding: 12px 22px;
@@ -525,6 +535,108 @@ select:hover {
   padding: 24px;
 }
 
+.category-chart-controls {
+  display: grid;
+  width: min(100%, 300px);
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.category-chart-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+
+.category-pie-chart svg {
+  display: block;
+  width: min(100%, 280px);
+  margin-inline: auto;
+  overflow: visible;
+}
+
+.category-pie-chart [data-chart-category] {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 2;
+  transition: filter 120ms ease, stroke-width 120ms ease;
+}
+
+.category-pie-chart [data-chart-category]:hover,
+.category-pie-chart [data-chart-category].selected {
+  filter: brightness(0.88);
+  stroke-width: 4;
+}
+
+.category-pie-chart [data-chart-category]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.category-chart-center-amount {
+  fill: var(--ink);
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.category-chart-center-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.category-chart-legend {
+  display: grid;
+  gap: 6px;
+}
+
+.category-chart-legend-item {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 2px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.category-chart-legend-item:hover:not(:disabled),
+.category-chart-legend-item[aria-pressed="true"] {
+  border-color: var(--line);
+  background: #f3f6fa;
+}
+
+.category-chart-legend-item:disabled {
+  cursor: default;
+}
+
+.category-chart-swatch {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 5px;
+}
+
+.category-chart-detail {
+  min-height: 28px;
+  margin: 18px 0 8px;
+  font-weight: 650;
+}
+
+.category-chart-summary {
+  margin: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #edf4f8;
+  color: var(--blue-dark);
+  font-weight: 650;
+}
+
 .budget-summary h2 {
   margin-bottom: 12px;
 }
@@ -649,6 +761,15 @@ footer p {
 
   .content-card {
     padding: 18px;
+  }
+
+  .category-chart-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .category-pie-chart svg {
+    width: min(100%, 260px);
   }
 }
 
