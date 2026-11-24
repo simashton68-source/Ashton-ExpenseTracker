@@ -275,3 +275,41 @@
   <script src="script.js"></script>
 </body>
 </html>
+
+<!-- Receipt Upload Section -->
+<div class="receipt-upload-section">
+  <h2>Upload a receipt</h2>
+  <p class="form-note">
+    Upload a receipt image or PDF to extract your expense details.
+  </p>
+
+  <label for="receipt-file">Choose receipt</label>
+
+  <input
+    type="file"
+    id="receipt-file"
+    name="receipt"
+    accept="image/*,application/pdf"
+  >
+
+  <div id="receipt-preview" class="receipt-preview" hidden>
+    <p id="receipt-file-name"></p>
+    <button
+      type="button"
+      id="remove-receipt"
+      class="button button-secondary"
+    >
+      Remove receipt
+    </button>
+  </div>
+
+  <button
+    type="button"
+    id="scan-receipt-button"
+    class="button button-secondary"
+  >
+    Scan receipt
+  </button>
+
+  <p id="receipt-status" class="form-note" role="status" aria-live="polite"></p>
+</div>

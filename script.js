@@ -955,3 +955,332 @@ if (storageError) {
   storageWarning.textContent = "We could not read saved expenses on this device. Your existing records have not been changed. Please reload the page or check this browser's storage settings.";
   storageWarning.hidden = false;
 }
+
+/*
+  RECEIPT PROCESSOR
+  Supports:
+  1. JPG, JPEG and PNG receipts using Tesseract.js OCR
+  2. Text-based and scanned PDF receipts using PDF.js
+*/
+
+const ReceiptProcessor = (() => {
+  let tesseractPromise;
+  let pdfjsPromise;
+
+  // Load OCR library only when needed
+  async function loadTesseract() {
+    if (!tesseractPromise) {
+      tesseractPromise = import(
+        "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js"
+      );
+    }
+    return tesseractPromise;
+  }
+
+  // Load PDF.js only when needed
+  async function loadPDFJS() {
+    if (!pdfjsPromise) {
+      pdfjsPromise = import(
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"
+      ).then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc =
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+        return pdfjs;
+      });
+    }
+    return pdfjsPromise;
+  }
+
+  // Extract text from an image using OCR
+  async function extractImageText(file, onProgress = () => {}) {
+    const Tesseract = await loadTesseract();
+
+    const worker = await Tesseract.createWorker("eng", 1, {
+      logger: (message) => {
+        if (message.status === "recognizing text") {
+          onProgress(Math.round(message.progress * 100));
+        }
+      }
+    });
+
+    try {
+      const result = await worker.recognize(file);
+      return {
+        text: result.data.text,
+        confidence: result.data.confidence
+      };
+    } finally {
+      await worker.terminate();
+    }
+  }
+
+  // Extract text from a PDF
+  async function extractPDFText(file, onProgress = () => {}) {
+    const pdfjs = await loadPDFJS();
+    const buffer = await file.arrayBuffer();
+
+    const pdf = await pdfjs.getDocument({
+      data: new Uint8Array(buffer)
+    }).promise;
+
+    let fullText = "";
+    let totalConfidence = 0;
+    let scannedPages = 0;
+
+    if (pdf.numPages > 20) {
+      throw new Error("Please upload a PDF containing no more than 20 pages.");
+    }
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+
+      const pageText = content.items
+        .filter((item) => typeof item.str === "string")
+        .map((item) => item.str)
+        .join(" ");
+
+      if (pageText.trim().length > 30) {
+        fullText += "\n" + pageText;
+      } else {
+        // If the PDF is scanned, render the page and use OCR
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+
+        await page.render({
+          canvasContext: context,
+          viewport
+        }).promise;
+
+        const Tesseract = await loadTesseract();
+        const worker = await Tesseract.createWorker("eng");
+
+        try {
+          const result = await worker.recognize(canvas);
+          fullText += "\n" + result.data.text;
+          totalConfidence += result.data.confidence;
+          scannedPages++;
+        } finally {
+          await worker.terminate();
+        }
+      }
+
+      onProgress(Math.round((pageNumber / pdf.numPages) * 100));
+    }
+
+    return {
+      text: fullText,
+      confidence: scannedPages
+        ? totalConfidence / scannedPages
+        : null
+    };
+  }
+
+  // Identify merchant, date and total amount
+  function parseReceipt(text) {
+    const lines = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    // Find merchant name from the first useful lines
+    const ignored = /receipt|invoice|tax invoice|cashier|thank you|tel:|phone|address|gst|u?nregistered/i;
+
+    const merchant = lines.find(line =>
+      line.length >= 2 &&
+      line.length <= 65 &&
+      !ignored.test(line) &&
+      !/^\d+$/.test(line)
+    ) || "Unknown merchant";
+
+    // Detect dates in common receipt formats
+    const datePatterns = [
+      /\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/,
+      /\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/
+    ];
+
+    let date = null;
+
+    for (const line of lines) {
+      for (let i = 0; i < datePatterns.length; i++) {
+        const match = line.match(datePatterns[i]);
+        if (!match) continue;
+
+        let year, month, day;
+
+        if (i === 0) {
+          [, year, month, day] = match;
+        } else {
+          [, day, month, year] = match;
+        }
+
+        const candidate = new Date(
+          Number(year),
+          Number(month) - 1,
+          Number(day)
+        );
+
+        if (
+          candidate.getFullYear() === Number(year) &&
+          candidate.getMonth() === Number(month) - 1 &&
+          candidate.getDate() === Number(day) &&
+          candidate <= new Date()
+        ) {
+          date = [
+            year,
+            String(month).padStart(2, "0"),
+            String(day).padStart(2, "0")
+          ].join("-");
+          break;
+        }
+      }
+
+      if (date) break;
+    }
+
+    // Find likely total amount
+    const amountPattern =
+      /(?:S\$|SGD|USD|\$)?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+\.\d{2})\b/g;
+
+    const amounts = [];
+
+    lines.forEach((line, index) => {
+      let match;
+
+      while ((match = amountPattern.exec(line)) !== null) {
+        const amount = Number(match[1].replace(/,/g, ""));
+
+        if (Number.isFinite(amount) && amount > 0) {
+          amounts.push({
+            amount,
+            line,
+            index
+          });
+        }
+      }
+    });
+
+    // Prefer amounts appearing beside total-related keywords
+    const totalKeywords = /grand total|total due|amount due|total|net total/i;
+
+    const totalCandidates = amounts.filter(item =>
+      totalKeywords.test(item.line)
+    );
+
+    // Otherwise use the largest detected amount as a suggestion
+    const candidates = totalCandidates.length
+      ? totalCandidates
+      : amounts;
+
+    const totalAmount = candidates.length
+      ? candidates.reduce((largest, item) =>
+          item.amount > largest.amount ? item : largest
+        ).amount
+      : null;
+
+    return {
+      merchant,
+      date,
+      amount: totalAmount,
+      description: merchant,
+      category: typeof suggestCategory === "function"
+        ? suggestCategory(merchant + " " + text)
+        : "Other Expenses",
+      rawText: text
+    };
+  }
+
+  // Main function: accepts an uploaded image or PDF
+  async function processFile(file, onProgress = () => {}) {
+    if (!file) {
+      throw new Error("Please select a receipt first.");
+    }
+
+    const maxSize = 10 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      throw new Error("Please upload a file smaller than 10 MB.");
+    }
+
+    const isPDF = file.type === "application/pdf";
+    const isImage = [
+      "image/jpeg",
+      "image/png"
+    ].includes(file.type);
+
+    if (!isPDF && !isImage) {
+      throw new Error("Please upload a JPG, PNG or PDF receipt.");
+    }
+
+    onProgress(0);
+
+    const result = isPDF
+      ? await extractPDFText(file, onProgress)
+      : await extractImageText(file, onProgress);
+
+    if (!result.text.trim()) {
+      throw new Error("No readable text was found in this receipt.");
+    }
+
+    const extracted = parseReceipt(result.text);
+
+    if (!extracted.amount) {
+      throw new Error(
+        "We could not identify the total amount. Please enter it manually."
+      );
+    }
+
+    return {
+      ...extracted,
+      confidence: result.confidence,
+      fileName: file.name
+    };
+  }
+
+  return {
+    processFile,
+    parseReceipt
+  };
+})();
+
+window.ReceiptProcessor = ReceiptProcessor;
+
+
+function applyReceiptToExpenseForm(receipt) {
+  if (!receipt || !receipt.amount) {
+    showMessage("Receipt information is incomplete.", "error");
+    return;
+  }
+
+  // Start a new expense rather than editing an old one
+  editingExpenseId = null;
+
+  descriptionInput.value = receipt.description || receipt.merchant;
+  amountInput.value = receipt.amount.toFixed(2);
+  dateInput.value = receipt.date || localDateString();
+
+  categoryInput.value = CATEGORIES.includes(receipt.category)
+    ? receipt.category
+    : "Other Expenses";
+
+  document.querySelector("#expense-form-heading").textContent =
+    "Review scanned expense";
+
+  document.querySelector("#save-expense-button").textContent =
+    "Confirm and Save Expense";
+
+  document.querySelector("#cancel-edit-button").hidden = false;
+
+  // Open the existing expense form for user confirmation
+  setView("add");
+
+  showMessage(
+    "Receipt processed! Please check the details before saving."
+  );
+
+  descriptionInput.focus();
+}
