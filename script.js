@@ -45,6 +45,7 @@ let storageReady = true;
 let storageError = null;
 let state = loadState();
 let editingExpenseId = null;
+let pendingReceiptFingerprint = null;
 let messageTimer = null;
 let selectedChartCategory = null;
 
@@ -737,7 +738,9 @@ function validateExpense(description, amount, date) {
 
 function resetExpenseForm() {
   editingExpenseId = null;
+  pendingReceiptFingerprint = null;
   expenseForm.reset();
+  clearReceiptSelection();
   dateInput.value = localDateString();
   document.querySelector("#expense-form-heading").textContent = "Add an expense";
   document.querySelector("#save-expense-button").textContent = "Save expense";
@@ -795,13 +798,28 @@ expenseForm.addEventListener("submit", (event) => {
     }
     Object.assign(expense, { description, amount, date, category: categoryInput.value });
   } else {
-    state.expenses.push({
+    if (
+      pendingReceiptFingerprint &&
+      state.expenses.some(
+        (expense) => expense.receiptFingerprint === pendingReceiptFingerprint
+      )
+    ) {
+      showMessage("This receipt has already been saved. It was not added again.", "warning");
+      receiptStatus.textContent = "This receipt has already been saved.";
+      return;
+    }
+
+    const expense = {
       id: globalThis.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       description,
       amount,
       date,
       category: categoryInput.value
-    });
+    };
+    if (pendingReceiptFingerprint) {
+      expense.receiptFingerprint = pendingReceiptFingerprint;
+    }
+    state.expenses.push(expense);
   }
   const wasEditing = Boolean(editingExpenseId);
   const saved = saveState();
@@ -1229,6 +1247,26 @@ const ReceiptProcessor = (() => {
     };
   }
 
+  function createReceiptFingerprint(text, receipt) {
+    const normalizedText = [
+      text,
+      receipt.merchant,
+      receipt.date || "",
+      receipt.amount.toFixed(2)
+    ].join(" ").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+
+    let firstHash = 2166136261;
+    let secondHash = 2166136261 ^ 0x9e3779b9;
+
+    for (let index = 0; index < normalizedText.length; index++) {
+      const character = normalizedText.charCodeAt(index);
+      firstHash = Math.imul(firstHash ^ character, 16777619);
+      secondHash = Math.imul(secondHash ^ character, 2246822519);
+    }
+
+    return `receipt-${(firstHash >>> 0).toString(16)}-${(secondHash >>> 0).toString(16)}`;
+  }
+
   // Main function: accepts an uploaded image or PDF
   async function processFile(file, onProgress = () => {}) {
     if (!file) {
@@ -1272,6 +1310,7 @@ const ReceiptProcessor = (() => {
 
     return {
       ...extracted,
+      receiptFingerprint: createReceiptFingerprint(result.text, extracted),
       confidence: result.confidence,
       fileName: file.name
     };
@@ -1285,39 +1324,30 @@ const ReceiptProcessor = (() => {
 
 window.ReceiptProcessor = ReceiptProcessor;
 
-
 function applyReceiptToExpenseForm(receipt) {
   if (!receipt || !receipt.amount) {
     showMessage("Receipt information is incomplete.", "error");
     return;
   }
 
-  // Start a new expense rather than editing an old one
   editingExpenseId = null;
+  pendingReceiptFingerprint = receipt.receiptFingerprint || null;
 
   descriptionInput.value = receipt.description || receipt.merchant;
   amountInput.value = receipt.amount.toFixed(2);
   dateInput.value = receipt.date || localDateString();
-
   categoryInput.value = CATEGORIES.includes(receipt.category)
     ? receipt.category
     : "Other Expenses";
 
   document.querySelector("#expense-form-heading").textContent =
     "Review scanned expense";
-
   document.querySelector("#save-expense-button").textContent =
     "Confirm and Save Expense";
-
   document.querySelector("#cancel-edit-button").hidden = false;
 
-  // Open the existing expense form for user confirmation
   setView("add");
-
-  showMessage(
-    "Receipt processed! Please check the details before saving."
-  );
-
+  showMessage("Receipt scanned. Check the details before saving.");
   descriptionInput.focus();
 }
 
@@ -1326,43 +1356,58 @@ const receiptCameraInput = document.querySelector("#receipt-camera-input");
 const receiptPreview = document.querySelector("#receipt-preview");
 const receiptFileName = document.querySelector("#receipt-file-name");
 const removeReceiptButton = document.querySelector("#remove-receipt");
-const scanReceiptButton = document.querySelector("#scan-receipt-button");
 const takeReceiptPhotoButton = document.querySelector("#take-receipt-photo");
 const receiptStatus = document.querySelector("#receipt-status");
 let selectedReceiptFile = null;
+let receiptScanVersion = 0;
 
 function clearReceiptSelection() {
+  receiptScanVersion++;
   selectedReceiptFile = null;
   receiptFileInput.value = "";
   receiptCameraInput.value = "";
   receiptPreview.hidden = true;
   receiptFileName.textContent = "";
   receiptStatus.textContent = "";
-  scanReceiptButton.disabled = false;
-  scanReceiptButton.textContent = "Scan receipt";
 }
 
-receiptFileInput.addEventListener("change", () => {
-  selectedReceiptFile = receiptFileInput.files[0] || null;
+async function scanReceiptFile(file) {
+  const scanVersion = ++receiptScanVersion;
+  receiptStatus.textContent = "Scanning receipt...";
 
-  if (!selectedReceiptFile) {
-    clearReceiptSelection();
-    return;
+  try {
+    const receipt = await window.ReceiptProcessor.processFile(file, (progress) => {
+      if (scanVersion === receiptScanVersion) {
+        receiptStatus.textContent = `Scanning receipt... ${progress}%`;
+      }
+    });
+
+    if (scanVersion !== receiptScanVersion) return;
+    receiptStatus.textContent = "Receipt scanned. Check the details below.";
+    applyReceiptToExpenseForm(receipt);
+  } catch (error) {
+    if (scanVersion !== receiptScanVersion) return;
+    console.error("Receipt scan failed:", error);
+    receiptStatus.textContent =
+      error instanceof Error ? error.message : "The receipt could not be scanned.";
   }
+}
 
-  receiptFileName.textContent = selectedReceiptFile.name;
-  receiptPreview.hidden = false;
-  receiptStatus.textContent = "Receipt ready to scan.";
-});
-
-receiptCameraInput.addEventListener("change", () => {
-  const file = receiptCameraInput.files[0];
+function selectReceiptFile(file) {
   if (!file) return;
 
   selectedReceiptFile = file;
   receiptFileName.textContent = file.name || "Photo from camera";
   receiptPreview.hidden = false;
-  receiptStatus.textContent = "Photo ready to scan.";
+  scanReceiptFile(file);
+}
+
+receiptFileInput.addEventListener("change", () => {
+  selectReceiptFile(receiptFileInput.files[0]);
+});
+
+receiptCameraInput.addEventListener("change", () => {
+  selectReceiptFile(receiptCameraInput.files[0]);
 });
 
 takeReceiptPhotoButton.addEventListener("click", () => {
@@ -1370,34 +1415,3 @@ takeReceiptPhotoButton.addEventListener("click", () => {
 });
 
 removeReceiptButton.addEventListener("click", clearReceiptSelection);
-
-scanReceiptButton.addEventListener("click", async () => {
-  if (!selectedReceiptFile) {
-    receiptStatus.textContent = "Choose a receipt image or PDF first.";
-    return;
-  }
-
-  scanReceiptButton.disabled = true;
-  scanReceiptButton.textContent = "Scanning...";
-
-  try {
-    const receipt = await window.ReceiptProcessor.processFile(
-      selectedReceiptFile,
-      (progress) => {
-        receiptStatus.textContent = `Scanning receipt... ${progress}%`;
-      }
-    );
-
-    receiptStatus.textContent = "Receipt scanned. Check the details below.";
-    applyReceiptToExpenseForm(receipt);
-  } catch (error) {
-    console.error("Receipt scan failed:", error);
-    receiptStatus.textContent =
-      error instanceof Error
-        ? error.message
-        : "The receipt could not be scanned.";
-  } finally {
-    scanReceiptButton.disabled = false;
-    scanReceiptButton.textContent = "Scan receipt";
-  }
-});

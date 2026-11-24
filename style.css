@@ -452,10 +452,6 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.receipt-upload-section > .button {
-  margin-top: 12px;
-}
-
 @media (max-width: 480px) {
   .receipt-preview {
     flex-direction: column;
