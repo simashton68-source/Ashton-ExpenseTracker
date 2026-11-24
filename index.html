@@ -3,17 +3,221 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My App</title>
+  <meta name="theme-color" content="#f5f7fa">
+  <title>My Expense Tracker</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <h1>My App</h1>
-    <p class="tagline">Built at the Computhink AI Coding Camp.</p>
+  <header class="site-header">
+    <div class="header-content">
+      <a class="brand" href="#home" aria-label="My Expense Tracker home">
+        <span class="brand-icon" aria-hidden="true">$</span>
+        <span>My Expense Tracker</span>
+      </a>
+      <p class="tagline">A simple way to remember what you spend.</p>
+    </div>
+  </header>
 
-    <!-- Your app goes here. Build it one Must at a time with Copilot. -->
+  <nav class="main-nav" aria-label="Main navigation">
+    <button class="nav-button active" type="button" data-view="home" aria-current="page">Home</button>
+    <button class="nav-button" type="button" data-view="add">Add Expense</button>
+    <button class="nav-button" type="button" data-view="history">History</button>
+    <button class="nav-button" type="button" data-view="budget">Budget</button>
+  </nav>
+
+  <main>
+    <div id="app-message" class="app-message" role="status" aria-live="polite" hidden></div>
+    <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
+
+    <section id="view-home" class="view">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">YOUR SPENDING</p>
+          <h1>Home</h1>
+          <p class="intro">Here is a clear look at your money.</p>
+        </div>
+        <button class="button button-primary button-large" type="button" data-go="add">+ Add Expense</button>
+      </div>
+
+      <section id="allowance-card" class="allowance-card" aria-labelledby="allowance-heading">
+        <div>
+          <p class="eyebrow">MONEY LEFT IN YOUR BUDGET</p>
+          <h2 id="allowance-heading" class="allowance-amount">Set up your allowance</h2>
+          <p id="allowance-detail" class="allowance-detail">Choose a daily or weekly allowance to see how much you have left.</p>
+        </div>
+        <button class="button button-light" type="button" data-go="budget">Set up budget</button>
+      </section>
+
+      <div class="summary-grid" aria-label="Spending summaries">
+        <article class="summary-card">
+          <h2>Spent today</h2>
+          <p id="today-total" class="summary-amount">$0.00</p>
+        </article>
+        <article class="summary-card">
+          <h2>Spent this week</h2>
+          <p id="week-total" class="summary-amount">$0.00</p>
+        </article>
+        <article class="summary-card">
+          <h2>Spent this month</h2>
+          <p id="month-total" class="summary-amount">$0.00</p>
+        </article>
+      </div>
+
+      <section class="content-card" aria-labelledby="chart-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="chart-heading">Your last 7 days</h2>
+            <p class="muted">Each bar shows what you spent that day.</p>
+          </div>
+        </div>
+        <div id="weekly-chart" class="weekly-chart" role="img" aria-label="Spending chart for the last seven days"></div>
+      </section>
+
+      <section class="content-card" aria-labelledby="recent-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="recent-heading">Recent expenses</h2>
+            <p class="muted">Your latest recorded purchases.</p>
+          </div>
+          <button class="button button-secondary" type="button" data-go="history">See all expenses</button>
+        </div>
+        <div id="recent-list" class="expense-list"></div>
+      </section>
+    </section>
+
+    <section id="view-add" class="view" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">QUICK AND EASY</p>
+          <h1 id="expense-form-heading">Add an expense</h1>
+          <p class="intro">Enter what you bought. We will suggest a category for you.</p>
+        </div>
+      </div>
+      <form id="expense-form" class="content-card form-card">
+        <label for="expense-description">What did you spend money on?</label>
+        <input id="expense-description" name="description" type="text" maxlength="120" placeholder="For example, lunch or groceries" autocomplete="off" required>
+
+        <label for="expense-amount">How much did it cost?</label>
+        <div class="amount-input">
+          <span aria-hidden="true">$</span>
+          <input id="expense-amount" name="amount" type="number" min="0.01" max="99999999.99" step="0.01" inputmode="decimal" placeholder="0.00" required>
+        </div>
+
+        <label for="expense-date">When did you spend it?</label>
+        <input id="expense-date" name="date" type="date" required>
+
+        <label for="expense-category">Category <span class="label-hint">(you can change this)</span></label>
+        <select id="expense-category" name="category" required>
+          <option value="Food and Drinks">Food and Drinks</option>
+          <option value="Groceries">Groceries</option>
+          <option value="Transportation">Transportation</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Healthcare">Healthcare</option>
+          <option value="Bills and Utilities">Bills and Utilities</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Other Expenses">Other Expenses</option>
+        </select>
+
+        <div class="form-actions">
+          <button id="save-expense-button" class="button button-primary button-large" type="submit">Save expense</button>
+          <button id="cancel-edit-button" class="button button-secondary" type="button" hidden>Cancel edit</button>
+        </div>
+        <p class="form-note">Your expense details are saved on this device.</p>
+      </form>
+    </section>
+
+    <section id="view-history" class="view" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">YOUR RECORDS</p>
+          <h1>Expense history</h1>
+          <p class="intro">Find, review, or correct a past expense.</p>
+        </div>
+      </div>
+      <section class="content-card filter-card" aria-label="Search and filter expenses">
+        <div class="filter-grid">
+          <div>
+            <label for="search-expenses">Search descriptions</label>
+            <input id="search-expenses" type="search" placeholder="For example, groceries">
+          </div>
+          <div>
+            <label for="filter-category">Category</label>
+            <select id="filter-category">
+              <option value="">All categories</option>
+              <option value="Food and Drinks">Food and Drinks</option>
+              <option value="Groceries">Groceries</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Bills and Utilities">Bills and Utilities</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Other Expenses">Other Expenses</option>
+            </select>
+          </div>
+          <div>
+            <label for="filter-from">From date</label>
+            <input id="filter-from" type="date">
+          </div>
+          <div>
+            <label for="filter-to">To date</label>
+            <input id="filter-to" type="date">
+          </div>
+        </div>
+        <p id="filter-error" class="field-error" role="alert" hidden></p>
+        <button id="clear-filters" class="button button-secondary" type="button">Clear filters</button>
+      </section>
+      <div class="summary-grid history-summary" aria-label="Daily and monthly spending summaries">
+        <article class="summary-card">
+          <h2>Spent today</h2>
+          <p id="history-today-total" class="summary-amount">$0.00</p>
+        </article>
+        <article class="summary-card">
+          <h2>Spent this month</h2>
+          <p id="history-month-total" class="summary-amount">$0.00</p>
+        </article>
+      </div>
+      <section class="content-card" aria-labelledby="history-results-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="history-results-heading">Expenses</h2>
+            <p id="history-total" class="muted"></p>
+          </div>
+        </div>
+        <div id="history-list" class="expense-list"></div>
+      </section>
+    </section>
+
+    <section id="view-budget" class="view" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">A PLAN THAT WORKS FOR YOU</p>
+          <h1>Your budget</h1>
+          <p class="intro">Choose how often you set your allowance. We will work out what is left.</p>
+        </div>
+      </div>
+      <form id="budget-form" class="content-card form-card">
+        <label for="allowance-type">How often do you want an allowance?</label>
+        <select id="allowance-type" name="allowanceType" required>
+          <option value="daily">Daily Allowance</option>
+          <option value="weekly">Weekly Allowance</option>
+        </select>
+        <label for="allowance-amount">How much is your allowance?</label>
+        <div class="amount-input">
+          <span aria-hidden="true">$</span>
+          <input id="allowance-amount" name="allowance" type="number" min="0.01" max="99999999.99" step="0.01" inputmode="decimal" placeholder="For example, 150.00" required>
+        </div>
+        <p class="form-note">You can change your allowance whenever you need to.</p>
+        <button class="button button-primary button-large" type="submit">Save allowance</button>
+      </form>
+      <section id="budget-summary-card" class="content-card budget-summary" aria-live="polite"></section>
+    </section>
+
   </main>
+
+  <footer>
+    <p>Your information stays on this device.</p>
+  </footer>
 
   <script src="script.js"></script>
 </body>
