@@ -990,7 +990,16 @@ const ReceiptProcessor = (() => {
     if (!tesseractPromise) {
       tesseractPromise = import(
         "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js"
-      );
+      ).then((module) => {
+        const tesseract = module.default;
+        if (!tesseract || typeof tesseract.createWorker !== "function") {
+          throw new Error("The OCR library did not provide its worker function.");
+        }
+        return tesseract;
+      }).catch((error) => {
+        tesseractPromise = null;
+        throw error;
+      });
     }
     return tesseractPromise;
   }
