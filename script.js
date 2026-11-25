@@ -6,8 +6,7 @@ const CATEGORIES = [
   "Shopping",
   "Healthcare",
   "Bills and Utilities",
-  "Entertainment",
-  "Other Expenses"
+  "Entertainment"
 ];
 const CATEGORY_ICONS = {
   "Food and Drinks": "🍽️",
@@ -16,8 +15,7 @@ const CATEGORY_ICONS = {
   Shopping: "🛍️",
   Healthcare: "💊",
   "Bills and Utilities": "💡",
-  Entertainment: "🎬",
-  "Other Expenses": "🧾"
+  Entertainment: "🎬"
 };
 const CATEGORY_CHART_COLORS = [
   "#c45127",
@@ -69,6 +67,9 @@ function loadState() {
     }
 
     const expenses = parsed.expenses.map((expense) => {
+      const category = CATEGORIES.includes(expense.category)
+        ? expense.category
+        : "Shopping";
       if (
         !expense ||
         typeof expense.id !== "string" ||
@@ -77,11 +78,11 @@ function loadState() {
         !Number.isFinite(expense.amount) ||
         expense.amount <= 0 ||
         !isValidDateString(expense.date) ||
-        !CATEGORIES.includes(expense.category)
+        !CATEGORIES.includes(category)
       ) {
         throw new Error("A saved expense is incomplete or invalid.");
       }
-      return expense;
+      return { ...expense, category };
     });
 
     const savedPreferences = { ...parsed.preferences };
@@ -161,18 +162,11 @@ function formatDate(value) {
   }).format(new Date(year, month - 1, day));
 }
 
-function showMessage(message, type = "success", useBrowserNotification = false) {
+function showMessage(message, type = "success") {
   window.clearTimeout(messageTimer);
   appMessage.textContent = message;
   appMessage.className = `app-message${type === "warning" ? " warning" : type === "error" ? " error" : type === "urgent" ? " urgent" : ""}`;
   appMessage.hidden = false;
-  if (useBrowserNotification && "Notification" in window && Notification.permission === "granted") {
-    try {
-      new Notification("My Expense Tracker", { body: message });
-    } catch (error) {
-      console.error("Could not show a browser notification:", error);
-    }
-  }
   messageTimer = window.setTimeout(() => {
     appMessage.hidden = true;
   }, 9000);
@@ -343,7 +337,7 @@ function createExpenseItem(expense, showActions) {
   const icon = document.createElement("span");
   icon.className = `category-icon category-${CATEGORIES.indexOf(expense.category)}`;
   icon.setAttribute("aria-hidden", "true");
-  icon.textContent = CATEGORY_ICONS[expense.category] || CATEGORY_ICONS["Other Expenses"];
+  icon.textContent = CATEGORY_ICONS[expense.category] || CATEGORY_ICONS.Shopping;
   category.textContent = expense.category;
   category.prepend(icon);
   const date = document.createElement("span");
@@ -529,8 +523,6 @@ function renderCategoryChart() {
   const periodInput = document.querySelector("#category-chart-period");
   const chart = document.querySelector("#category-pie-chart");
   const legend = document.querySelector("#category-chart-legend");
-  const detail = document.querySelector("#category-chart-detail");
-  const summary = document.querySelector("#category-chart-summary");
   const period = periodInput.value;
   const today = new Date();
   const todayString = localDateString(today);
@@ -569,10 +561,6 @@ function renderCategoryChart() {
 
   function selectCategory(category) {
     selectedChartCategory = category;
-    const selected = categoryTotals.find((item) => item.category === category);
-    if (!selected) return;
-    const percentage = selected.amount / total * 100;
-    detail.textContent = `${selected.category}: ${formatCurrency(selected.amount)} (${percentage.toFixed(1)}% of ${periodLabel}'s spending).`;
     svg.querySelectorAll("[data-chart-category]").forEach((slice) => {
       slice.setAttribute("aria-pressed", String(slice.dataset.chartCategory === category));
       slice.classList.toggle("selected", slice.dataset.chartCategory === category);
@@ -588,7 +576,7 @@ function renderCategoryChart() {
     slice.setAttribute("tabindex", "0");
     slice.setAttribute("aria-pressed", String(selectedChartCategory === category));
     const categoryAmount = categoryTotals.find((item) => item.category === category).amount;
-    slice.setAttribute("aria-label", `${category}: ${formatCurrency(categoryAmount)} (${(categoryAmount / total * 100).toFixed(1)}%). Select for details.`);
+    slice.setAttribute("aria-label", `${category}: ${formatCurrency(categoryAmount)} (${(categoryAmount / total * 100).toFixed(1)}%). Highlight this category.`);
     slice.classList.toggle("selected", selectedChartCategory === category);
     slice.addEventListener("click", () => selectCategory(category));
     slice.addEventListener("keydown", (event) => {
@@ -691,19 +679,11 @@ function renderCategoryChart() {
 
   if (categoryTotals.length === 0) {
     selectedChartCategory = null;
-    detail.textContent = `No expenses recorded ${periodLabel} yet. Add an expense to see the breakdown.`;
-    summary.textContent = `No expenses recorded ${periodLabel} yet.`;
     return;
   }
 
-  const highestCategory = categoryTotals.reduce((highest, item) =>
-    item.amount > highest.amount ? item : highest
-  );
-  const highestPercentage = Math.round(highestCategory.amount / total * 100);
-  summary.textContent = `You spent the most on ${highestCategory.category} ${periodLabel}, accounting for ${highestPercentage}% of your total expenses.`;
   if (!categoryTotals.some((item) => item.category === selectedChartCategory)) {
     selectedChartCategory = null;
-    detail.textContent = "Select a category in the chart or legend to see its amount and percentage.";
   } else {
     selectCategory(selectedChartCategory);
   }
@@ -723,7 +703,7 @@ function suggestCategory(description) {
   for (const [category, keywords] of rules) {
     if (keywords.some((keyword) => text.includes(keyword))) return category;
   }
-  return "Other Expenses";
+  return "Shopping";
 }
 
 function validateExpense(description, amount, date) {
@@ -783,6 +763,7 @@ expenseForm.addEventListener("submit", (event) => {
   const description = descriptionInput.value.trim();
   const amount = Number(amountInput.value);
   const date = dateInput.value;
+  const category = categoryInput.value;
   const validationMessage = validateExpense(description, amount, date);
   if (validationMessage) {
     showMessage(validationMessage, "error");
@@ -796,7 +777,7 @@ expenseForm.addEventListener("submit", (event) => {
       resetExpenseForm();
       return;
     }
-    Object.assign(expense, { description, amount, date, category: categoryInput.value });
+    Object.assign(expense, { description, amount, date, category });
   } else {
     if (
       pendingReceiptFingerprint &&
@@ -814,7 +795,7 @@ expenseForm.addEventListener("submit", (event) => {
       description,
       amount,
       date,
-      category: categoryInput.value
+      category
     };
     if (pendingReceiptFingerprint) {
       expense.receiptFingerprint = pendingReceiptFingerprint;
@@ -826,13 +807,13 @@ expenseForm.addEventListener("submit", (event) => {
   resetExpenseForm();
   renderAll();
   setView("home");
+  checkBudgetThresholds();
   showMessage(
     saved
       ? wasEditing ? "Your expense was updated." : "Expense saved. Your spending summary has been updated."
       : "This change is available for this session, but could not be saved on this device.",
     saved ? "success" : "error"
   );
-  checkBudgetThresholds();
 });
 
 document.querySelector("#cancel-edit-button").addEventListener("click", () => {
@@ -1251,7 +1232,7 @@ const ReceiptProcessor = (() => {
       description: merchant,
       category: typeof suggestCategory === "function"
         ? suggestCategory(merchant + " " + text)
-        : "Other Expenses",
+        : "Shopping",
       rawText: text
     };
   }
@@ -1347,7 +1328,7 @@ function applyReceiptToExpenseForm(receipt) {
   dateInput.value = receipt.date || localDateString();
   categoryInput.value = CATEGORIES.includes(receipt.category)
     ? receipt.category
-    : "Other Expenses";
+    : "Shopping";
 
   document.querySelector("#expense-form-heading").textContent =
     "Review scanned expense";

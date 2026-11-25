@@ -23,7 +23,7 @@ some adults and elderly need an expense tracker because they would forget what t
 - Must 2: Expense history on search
   - Done when: I type "Groceries" and I see all my spendings on each "Groceries" trip I went.
 - Must 3: Daily spending reminder
-  - Done when: I spend on something and I see a notification that says "You have spent on... " In the  "..." you put in whatever I have typed in the "spend: " text box. For exapmle "spend: Groceries", notification must say "You have spent on Groceries.
+  - Done when: After I add an expense, I see a reminder with what I spent on, how much I spent today, and how much is left in my daily or weekly allowance. If I have not set an allowance, it tells me to set one to see how much is left.
 
 ## Later: do not build
 
